@@ -6,41 +6,27 @@ import platform
 from sys import version as pyver
 
 import psutil
-from pyrogram import version as pyrover
+from pyrogram import __version__ as pyrover
 from pyrogram import filters
 from pyrogram.errors import MessageIdInvalid
 from pyrogram.types import InputMediaPhoto, Message
-from pytgcalls.version import version as pytgver
+from pytgcalls.__version__ import __version__ as pytgver
 
 import config
 from AloneMusic import app
 from AloneMusic.core.userbot import assistants
 from AloneMusic.misc import SUDOERS, mongodb
 from AloneMusic.plugins import ALL_MODULES
-from AloneMusic.utils.database import (
-    get_served_chats,
-    get_served_users,
-    get_sudoers,
-)
+from AloneMusic.utils.database import get_served_chats, get_served_users, get_sudoers
 from AloneMusic.utils.decorators.language import language, languageCB
 from AloneMusic.utils.inline.stats import back_stats_buttons, stats_buttons
 from config import BANNED_USERS
 
-# 🔐 SUDO CHECK FUNCTION
-def is_sudo(user_id: int):
-    return user_id in SUDOERS or user_id == config.OWNER_ID
-
-
-# =============================== STATS COMMAND ===============================
 
 @app.on_message(filters.command(["stats", "gstats"]) & filters.group & ~BANNED_USERS)
 @language
 async def stats_global(client, message: Message, _):
-
-    if not is_sudo(message.from_user.id):
-        return await message.reply_text("❌ You are not a sudo user")
-
-    upl = stats_buttons(_, True)
+    upl = stats_buttons(_, True if message.from_user.id in SUDOERS else False)
     await message.reply_photo(
         photo=config.STATS_IMG_URL,
         caption=_["gstats_2"].format(app.mention),
@@ -48,37 +34,26 @@ async def stats_global(client, message: Message, _):
     )
 
 
-# =============================== BACK BUTTON ===============================
-
 @app.on_callback_query(filters.regex("stats_back") & ~BANNED_USERS)
 @languageCB
 async def home_stats(client, CallbackQuery, _):
-
-    if not is_sudo(CallbackQuery.from_user.id):
-        return await CallbackQuery.answer(
-            "❌ You are not a sudo user", show_alert=True
-        )
-
-    upl = stats_buttons(_, True)
+    upl = stats_buttons(_, True if CallbackQuery.from_user.id in SUDOERS else False)
     await CallbackQuery.edit_message_text(
         text=_["gstats_2"].format(app.mention),
         reply_markup=upl,
     )
 
 
-# =============================== OVERALL STATS ===============================
-
 @app.on_callback_query(filters.regex("TopOverall") & ~BANNED_USERS)
 @languageCB
 async def overall_stats(client, CallbackQuery, _):
-
-    if not is_sudo(CallbackQuery.from_user.id):
-        return await CallbackQuery.answer(
-            "❌ You are not a sudo user", show_alert=True
-        )
-
     await CallbackQuery.answer()
     upl = back_stats_buttons(_)
+
+    try:
+        await CallbackQuery.answer()
+    except:
+        pass
 
     await CallbackQuery.edit_message_text(_["gstats_1"].format(app.mention))
 
@@ -103,474 +78,56 @@ async def overall_stats(client, CallbackQuery, _):
         await CallbackQuery.edit_message_media(media=med, reply_markup=upl)
     except MessageIdInvalid:
         await CallbackQuery.message.reply_photo(
-            photo=config.STATS_IMG_URL, caption=text, reply_markup=upl
+            photo=config.STATS_IMG_URL,
+            caption=text,
+            reply_markup=upl
         )
 
-
-# =============================== BOT HARDWARE STATS ===============================
 
 @app.on_callback_query(filters.regex("bot_stats_sudo"))
 @languageCB
 async def bot_stats(client, CallbackQuery, _):
 
-    if not is_sudo(CallbackQuery.from_user.id):
-        return await CallbackQuery.answer(
-            "❌ You are not a sudo user", show_alert=True
-        )
+    if CallbackQuery.from_user.id not in SUDOERS:
+        return await CallbackQuery.answer(_["gstats_4"], show_alert=True)
 
     upl = back_stats_buttons(_)
 
-    await CallbackQuery.answer()
+    try:
+        await CallbackQuery.answer()
+    except:
+        pass
+
     await CallbackQuery.edit_message_text(_["gstats_1"].format(app.mention))
 
     p_core = psutil.cpu_count(logical=False)
     t_core = psutil.cpu_count(logical=True)
 
-    ram = str(round(psutil.virtual_memory().total / (1024.0 ** 3))) + " GB"
+    ram = str(round(psutil.virtual_memory().total / (1024.0 ** 3))) + " ɢʙ"
 
-try:
+    try:
         cpu_freq = psutil.cpu_freq().current
-        cpu_freq = (
-            f"{round(cpu_freq / 1000, 2)} GHz"
-            if cpu_freq >= 1000
-            else f"{round(cpu_freq, 2)} MHz"
-        )
-    except:
-        cpu_freq = "Failed to fetch"
-
-    hdd = psutil.disk_usage("/")
-    total = hdd.total / (1024.0 ** 3)
-    used = hdd.used / (1024.0 ** 3)
-    free = hdd.free / (1024.0 ** 3)
-
-    call = await mongodb.command("dbstats")
-
-    datasize = call["dataSize"] / 1024
-    storage = call["storageSize"] / 1024
-
-    served_chats = len(await get_served_chats())
-    served_users = len(await get_served_users())
-
-    text = _["gstats_5"].format(
-        app.mention,
-        len(ALL_MODULES),
-        platform.system(),
-        ram,
-        p_core,
-        t_core,
-        cpu_freq,
-        pyver.split()[0],
-        pyrover,
-        pytgver,
-        str(total)[:4],
-        str(used)[:4],
-        str(free)[:4],
-        served_chats,
-        served_users,
-        len(BANNED_USERS),
-        len(await get_sudoers()),
-        str(datasize)[:6],
-        storage,
-        call["collections"],
-        call["objects"],
-    )
-
-    med = InputMediaPhoto(media=config.STATS_IMG_URL, caption=text)
-
-    try:
-        await CallbackQuery.edit_message_media(media=med, reply_markup=upl)
-    except MessageIdInvalid:
-        await CallbackQuery.message.reply_photo(
-            photo=config.STATS_IMG_URL,
-            caption=text,
-            reply_markup=upl,
-)Pi͢͢͢kสcђu♡:
-#
-# Copyright (C) 2021-2022 by TheAloneteam@Github
-#
-
-import platform
-from sys import version as pyver
-
-import psutil
-from pyrogram import version as pyrover
-from pyrogram import filters
-from pyrogram.errors import MessageIdInvalid
-from pyrogram.types import InputMediaPhoto, Message
-from pytgcalls.version import version as pytgver
-
-import config
-from AloneMusic import app
-from AloneMusic.core.userbot import assistants
-from AloneMusic.misc import SUDOERS, mongodb
-from AloneMusic.plugins import ALL_MODULES
-from AloneMusic.utils.database import (
-    get_served_chats,
-    get_served_users,
-    get_sudoers,
-)
-from AloneMusic.utils.decorators.language import language, languageCB
-from AloneMusic.utils.inline.stats import back_stats_buttons, stats_buttons
-from config import BANNED_USERS
-
-# 🔐 SUDO CHECK FUNCTION
-def is_sudo(user_id: int):
-    return user_id in SUDOERS or user_id == config.OWNER_ID
-
-
-# =============================== STATS COMMAND ===============================
-
-@app.on_message(filters.command(["stats", "gstats"]) & filters.group & ~BANNED_USERS)
-@language
-async def stats_global(client, message: Message, _):
-
-    if not is_sudo(message.from_user.id):
-        return await message.reply_text("❌ You are not a sudo user")
-
-    upl = stats_buttons(_, True)
-    await message.reply_photo(
-        photo=config.STATS_IMG_URL,
-        caption=_["gstats_2"].format(app.mention),
-        reply_markup=upl,
-    )
-
-
-# =============================== BACK BUTTON ===============================
-
-@app.on_callback_query(filters.regex("stats_back") & ~BANNED_USERS)
-@languageCB
-async def home_stats(client, CallbackQuery, _):
-
-    if not is_sudo(CallbackQuery.from_user.id):
-        return await CallbackQuery.answer(
-            "❌ You are not a sudo user", show_alert=True
-        )
-
-    upl = stats_buttons(_, True)
-    await CallbackQuery.edit_message_text(
-        text=_["gstats_2"].format(app.mention),
-        reply_markup=upl,
-    )
-
-
-# =============================== OVERALL STATS ===============================
-
-@app.on_callback_query(filters.regex("TopOverall") & ~BANNED_USERS)
-@languageCB
-async def overall_stats(client, CallbackQuery, _):
-
-    if not is_sudo(CallbackQuery.from_user.id):
-        return await CallbackQuery.answer(
-            "❌ You are not a sudo user", show_alert=True
-        )
-
-    await CallbackQuery.answer()
-    upl = back_stats_buttons(_)
-
-    await CallbackQuery.edit_message_text(_["gstats_1"].format(app.mention))
-
-    served_chats = len(await get_served_chats())
-    served_users = len(await get_served_users())
-
-    text = _["gstats_3"].format(
-        app.mention,
-        len(assistants),
-        len(BANNED_USERS),
-        served_chats,
-        served_users,
-        len(ALL_MODULES),
-        len(SUDOERS),
-        config.AUTO_LEAVING_ASSISTANT,
-        config.DURATION_LIMIT_MIN,
-    )
-
-    med = InputMediaPhoto(media=config.STATS_IMG_URL, caption=text)
-
-    try:
-        await CallbackQuery.edit_message_media(media=med, reply_markup=upl)
-    except MessageIdInvalid:
-        await CallbackQuery.message.reply_photo(
-            photo=config.STATS_IMG_URL, caption=text, reply_markup=upl
-        )
-
-
-# =============================== BOT HARDWARE STATS ===============================
-
-@app.on_callback_query(filters.regex("bot_stats_sudo"))
-@languageCB
-async def bot_stats(client, CallbackQuery, _):
-
-    if not is_sudo(CallbackQuery.from_user.id):
-        return await CallbackQuery.answer(
-            "❌ You are not a sudo user", show_alert=True
-        )
-
-    upl = back_stats_buttons(_)
-
-    await CallbackQuery.answer()
-    await CallbackQuery.edit_message_text(_["gstats_1"].format(app.mention))
-
-    p_core = psutil.cpu_count(logical=False)
-    t_core = psutil.cpu_count(logical=True)
-
-    ram = str(round(psutil.virtual_memory().total / (1024.0 ** 3))) + " GB"
-
-try:
-        cpu_freq = psutil.cpu_freq().current
-        cpu_freq = (
-            f"{round(cpu_freq / 1000, 2)} GHz"
-            if cpu_freq >= 1000
-            else f"{round(cpu_freq, 2)} MHz"
-        )
-    except:
-        cpu_freq = "Failed to fetch"
-
-    hdd = psutil.disk_usage("/")
-    total = hdd.total / (1024.0 ** 3)
-    used = hdd.used / (1024.0 ** 3)
-    free = hdd.free / (1024.0 ** 3)
-
-    call = await mongodb.command("dbstats")
-
-    datasize = call["dataSize"] / 1024
-    storage = call["storageSize"] / 1024
-
-    served_chats = len(await get_served_chats())
-    served_users = len(await get_served_users())
-
-    text = _["gstats_5"].format(
-        app.mention,
-        len(ALL_MODULES),
-        platform.system(),
-        ram,
-        p_core,
-        t_core,
-        cpu_freq,
-        pyver.split()[0],
-        pyrover,
-        pytgver,
-        str(total)[:4],
-        str(used)[:4],
-        str(free)[:4],
-        served_chats,
-        served_users,
-        len(BANNED_USERS),
-        len(await get_sudoers()),
-        str(datasize)[:6],
-        storage,
-        call["collections"],
-        call["objects"],
-    )
-
-    med = InputMediaPhoto(media=config.STATS_IMG_URL, caption=text)
-
-    try:
-        await CallbackQuery.edit_message_media(media=med, reply_markup=upl)
-    except MessageIdInvalid:
-        await CallbackQuery.message.reply_photo(
-            photo=config.STATS_IMG_URL,
-            caption=text,
-            reply_markup=upl,
-        )Pi͢͢͢kสcђu♡:
-#
-# Copyright (C) 2021-2022 by TheAloneteam@Github
-#
-
-import platform
-from sys import version as pyver
-
-import psutil
-from pyrogram import version as pyrover
-from pyrogram import filters
-from pyrogram.errors import MessageIdInvalid
-from pyrogram.types import InputMediaPhoto, Message
-from pytgcalls.version import version as pytgver
-
-import config
-from AloneMusic import app
-from AloneMusic.core.userbot import assistants
-from AloneMusic.misc import SUDOERS, mongodb
-from AloneMusic.plugins import ALL_MODULES
-from AloneMusic.utils.database import (
-    get_served_chats,
-    get_served_users,
-    get_sudoers,
-)
-from AloneMusic.utils.decorators.language import language, languageCB
-from AloneMusic.utils.inline.stats import back_stats_buttons, stats_buttons
-from config import BANNED_USERS
-
-# 🔐 SUDO CHECK FUNCTION
-def is_sudo(user_id: int):
-    return user_id in SUDOERS or user_id == config.OWNER_ID
-
-
-# =============================== STATS COMMAND ===============================
-
-@app.on_message(filters.command(["stats", "gstats"]) & filters.group & ~BANNED_USERS)
-@language
-async def stats_global(client, message: Message, _):
-
-    if not is_sudo(message.from_user.id):
-        return await message.reply_text("❌ You are not a sudo user")
-
-    upl = stats_buttons(_, True)
-    await message.reply_photo(
-        photo=config.STATS_IMG_URL,
-        caption=_["gstats_2"].format(app.mention),
-        reply_markup=upl,
-    )
-
-
-# =============================== BACK BUTTON ===============================
-
-@app.on_callback_query(filters.regex("stats_back") & ~BANNED_USERS)
-@languageCB
-async def home_stats(client, CallbackQuery, _):
-
-    if not is_sudo(CallbackQuery.from_user.id):
-        return await CallbackQuery.answer(
-            "❌ You are not a sudo user", show_alert=True
-        )
-
-    upl = stats_buttons(_, True)
-    await CallbackQuery.edit_message_text(
-        text=_["gstats_2"].format(app.mention),
-        reply_markup=upl,
-    )
-
-
-# =============================== OVERALL STATS ===============================
-
-@app.on_callback_query(filters.regex("TopOverall") & ~BANNED_USERS)
-@languageCB
-async def overall_stats(client, CallbackQuery, _):
-
-    if not is_sudo(CallbackQuery.from_user.id):
-        return await CallbackQuery.answer(
-            "❌ You are not a sudo user", show_alert=True
-        )
-
-    await CallbackQuery.answer()
-    upl = back_stats_buttons(_)
-
-    await CallbackQuery.edit_message_text(_["gstats_1"].format(app.mention))
-
-    served_chats = len(await get_served_chats())
-    served_users = len(await get_served_users())
-
-    text = _["gstats_3"].format(
-        app.mention,
-        len(assistants),
-        len(BANNED_USERS),
-        served_chats,
-        served_users,
-        len(ALL_MODULES),
-        len(SUDOERS),
-        config.AUTO_LEAVING_ASSISTANT,
-        config.DURATION_LIMIT_MIN,
-    )
-
-    med = InputMediaPhoto(media=config.STATS_IMG_URL, caption=text)
-
-    try:
-        await CallbackQuery.edit_message_media(media=med, reply_markup=upl)
-    except MessageIdInvalid:
-        await CallbackQuery.message.reply_photo(
-            photo=config.STATS_IMG_URL, caption=text, reply_markup=upl
-        )
-
-
-# =============================== BOT HARDWARE STATS ===============================
-
-@app.on_callback_query(filters.regex("bot_stats_sudo"))
-@languageCB
-async def bot_stats(client, CallbackQuery, _):
-
-    if not is_sudo(CallbackQuery.from_user.id):
-        return await CallbackQuery.answer(
-            "❌ You are not a sudo user", show_alert=True
-        )
-
-    upl = back_stats_buttons(_)
-
-    await CallbackQuery.answer()
-    await CallbackQuery.edit_message_text(_["gstats_1"].format(app.mention))
-
-    p_core = psutil.cpu_count(logical=False)
-    t_core = psutil.cpu_count(logical=True)
-
-    ram = str(round(psutil.virtual_memory().total / (1024.0 ** 3))) + " GB"
-
-try:
-        cpu_freq = psutil.cpu_freq().current
-        cpu_freq = (
-            f"{round(cpu_freq / 1000, 2)} GHz"
-            if cpu_freq >= 1000
-            else f"{round(cpu_freq, 2)} MHz"
-        )
-    except:
-        cpu_freq = "Failed to fetch"
-
-    hdd = psutil.disk_usage("/")
-    total = hdd.total / (1024.0 ** 3)
-    used = hdd.used / (1024.0 ** 3)
-    free = hdd.free / (1024.0 ** 3)
-
-    call = await mongodb.command("dbstats")
-
-    datasize = call["dataSize"] / 1024
-    storage = call["storageSize"] / 1024
-
-    served_chats = len(await get_served_chats())
-    served_users = len(await get_served_users())
-
-    text = _["gstats_5"].format(
-        app.mention,
-        len(ALL_MODULES),
-        platform.system(),
-        ram,
-        p_core,
-        t_core,
-        cpu_freq,
-        pyver.split()[0],
-        pyrover,
-        pytgver,
-        str(total)[:4],
-        str(used)[:4],
-        str(free)[:4],
-        served_chats,
-        served_users,
-        len(BANNED_USERS),
-        len(await get_sudoers()),
-        str(datasize)[:6],
-        storage,
-        call["collections"],
-        call["objects"],
-    )
-
-    med = InputMediaPhoto(media=config.STATS_IMG_URL, caption=text)
-
-    try:
-        await CallbackQuery.edit_message_media(media=med, reply_markup=upl)
-    except MessageIdInvalid:
-        await CallbackQuery.message.reply_photo(
-            photo=config.STATS_IMG_URL,
-            caption=text,
-            reply_markup=upl,
-        )        else:
+        if cpu_freq >= 1000:
+            cpu_freq = f"{round(cpu_freq / 1000, 2)}ɢʜᴢ"
+        else:
             cpu_freq = f"{round(cpu_freq, 2)}ᴍʜᴢ"
     except:
         cpu_freq = "ғᴀɪʟᴇᴅ ᴛᴏ ғᴇᴛᴄʜ"
+
     hdd = psutil.disk_usage("/")
-    total = hdd.total / (1024.0**3)
-    used = hdd.used / (1024.0**3)
-    free = hdd.free / (1024.0**3)
+
+    total = hdd.total / (1024.0 ** 3)
+    used = hdd.used / (1024.0 ** 3)
+    free = hdd.free / (1024.0 ** 3)
+
     call = await mongodb.command("dbstats")
+
     datasize = call["dataSize"] / 1024
     storage = call["storageSize"] / 1024
+
     served_chats = len(await get_served_chats())
     served_users = len(await get_served_users())
+
     text = _["gstats_5"].format(
         app.mention,
         len(ALL_MODULES),
@@ -594,10 +151,14 @@ try:
         call["collections"],
         call["objects"],
     )
+
     med = InputMediaPhoto(media=config.STATS_IMG_URL, caption=text)
+
     try:
         await CallbackQuery.edit_message_media(media=med, reply_markup=upl)
     except MessageIdInvalid:
         await CallbackQuery.message.reply_photo(
-            photo=config.STATS_IMG_URL, caption=text, reply_markup=upl
+            photo=config.STATS_IMG_URL,
+            caption=text,
+            reply_markup=upl
         )
