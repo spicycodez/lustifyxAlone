@@ -6,7 +6,7 @@
 # Please see < https://github.com/TheAloneTeam/AloneMusic/blob/master/LICENSE >
 #
 # All rights reserved.
- 
+
 import math
 
 from pyrogram.types import InlineKeyboardButton
