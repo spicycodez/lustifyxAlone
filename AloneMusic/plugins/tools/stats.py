@@ -17,7 +17,8 @@ from AloneMusic import app
 from AloneMusic.core.userbot import assistants
 from AloneMusic.misc import SUDOERS, mongodb
 from AloneMusic.plugins import ALL_MODULES
-from AloneMusic.utils.database import get_served_chats, get_served_users, get_sudoers
+from AloneMusic.utils.database import (get_served_chats, get_served_users,
+                                       get_sudoers)
 from AloneMusic.utils.decorators.language import language, languageCB
 from AloneMusic.utils.inline.stats import back_stats_buttons, stats_buttons
 from config import BANNED_USERS
@@ -78,9 +79,7 @@ async def overall_stats(client, CallbackQuery, _):
         await CallbackQuery.edit_message_media(media=med, reply_markup=upl)
     except MessageIdInvalid:
         await CallbackQuery.message.reply_photo(
-            photo=config.STATS_IMG_URL,
-            caption=text,
-            reply_markup=upl
+            photo=config.STATS_IMG_URL, caption=text, reply_markup=upl
         )
 
 
@@ -103,7 +102,7 @@ async def bot_stats(client, CallbackQuery, _):
     p_core = psutil.cpu_count(logical=False)
     t_core = psutil.cpu_count(logical=True)
 
-    ram = str(round(psutil.virtual_memory().total / (1024.0 ** 3))) + " ɢʙ"
+    ram = str(round(psutil.virtual_memory().total / (1024.0**3))) + " ɢʙ"
 
     try:
         cpu_freq = psutil.cpu_freq().current
@@ -116,9 +115,9 @@ async def bot_stats(client, CallbackQuery, _):
 
     hdd = psutil.disk_usage("/")
 
-    total = hdd.total / (1024.0 ** 3)
-    used = hdd.used / (1024.0 ** 3)
-    free = hdd.free / (1024.0 ** 3)
+    total = hdd.total / (1024.0**3)
+    used = hdd.used / (1024.0**3)
+    free = hdd.free / (1024.0**3)
 
     call = await mongodb.command("dbstats")
 
@@ -158,7 +157,5 @@ async def bot_stats(client, CallbackQuery, _):
         await CallbackQuery.edit_message_media(media=med, reply_markup=upl)
     except MessageIdInvalid:
         await CallbackQuery.message.reply_photo(
-            photo=config.STATS_IMG_URL,
-            caption=text,
-            reply_markup=upl
+            photo=config.STATS_IMG_URL, caption=text, reply_markup=upl
         )
